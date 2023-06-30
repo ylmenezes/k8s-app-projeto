@@ -1,0 +1,88 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: local
+  namespace: default
+  labels:
+    app: local
+spec:
+  storageClassName: manual
+  capacity:
+    storage: 256Mi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: /meubanco/
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: k8s-volume
+  namespace: default
+  labels:
+    app: k8s-volume
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Mi
+  storageClassName: manual
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: k8s-db
+  namespace: default
+  labels:
+    app: k8s-db
+spec:
+  selector:
+    matchLabels:
+      app: k8s-db
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: k8s-db
+    spec:
+      containers:
+        - name: k8s-db
+          image: ylmenezes/db-mensagem:1.1
+          args:
+            - "--ignore-db-dir=lost+found"
+          ports:
+            - containerPort: 3306
+          volumeMounts:
+            - name: k8s-volume
+              mountPath: /var/lib/mysql
+      volumes:
+        - name: k8s-volume
+          persistentVolumeClaim:
+            claimName: k8s-volume
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: k8s-back
+  namespace: default
+  labels:
+    app: k8s-back
+spec:
+  selector:
+    matchLabels:
+      app: k8s-back
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        app: k8s-back
+    spec:
+      containers:
+        - name: k8s-back
+          image: ylmenezes/back-mensagem:1.1
+          ports:
+            - containerPort: 80
